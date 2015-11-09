@@ -48,6 +48,8 @@ BEGIN_MESSAGE_MAP(CMainDlg, CDialogEx)
 	ON_WM_SYSCOMMAND()
 	ON_WM_PAINT()
 	ON_WM_QUERYDRAGICON()
+	ON_BN_CLICKED(IDC_BROWSE_INCREDIMAIL_DIRECTORY, &CMainDlg::OnBnClickedBrowseIncredimailDirectory)
+	ON_BN_CLICKED(IDC_BROWSE_OUTPUT_FOLDER, &CMainDlg::OnBnClickedBrowseOutputFolder)
 END_MESSAGE_MAP()
 
 
@@ -121,3 +123,65 @@ HCURSOR CMainDlg::OnQueryDragIcon()
 	return static_cast<HCURSOR>(m_hIcon);
 }
 
+std::wstring CMainDlg::openFolderDialog()
+{
+	IFileOpenDialog* pDialog;
+	HRESULT hr = ::CoCreateInstance(CLSID_FileOpenDialog, nullptr, CLSCTX_INPROC_SERVER, IID_PPV_ARGS(&pDialog));
+	if (FAILED(hr))
+		return L"";
+
+	pDialog->SetOptions(FOS_PICKFOLDERS);
+
+	hr = pDialog->Show(GetSafeHwnd());
+	if (FAILED(hr)) 
+	{
+		pDialog->Release();
+		return L"";
+	}
+
+	IShellItem* pShellItem;
+	hr = pDialog->GetResult(&pShellItem);
+	if (FAILED(hr)) 
+	{
+		pDialog->Release();
+		return L"";
+	}
+
+	LPWSTR pPath;
+	hr = pShellItem->GetDisplayName(SIGDN_FILESYSPATH, &pPath);
+	if (FAILED(hr))
+	{
+		pShellItem->Release();
+		pDialog->Release();
+		return L"";
+	}
+
+	std::wstring sResult = pPath;
+	CoTaskMemFree(pPath);
+
+	pShellItem->Release();
+	pDialog->Release();
+
+	return sResult;
+}
+
+void CMainDlg::setFolderForId(int nId) 
+{
+	std::wstring sPath = openFolderDialog();
+	if (!sPath.empty())
+	{
+		CEdit* pEdit = (CEdit*)GetDlgItem(nId);
+		pEdit->SetWindowTextW(sPath.c_str());
+	}
+}
+
+void CMainDlg::OnBnClickedBrowseIncredimailDirectory()
+{
+	setFolderForId(IDC_INCREDIMAIL_DIRECTORY);
+}
+
+
+void CMainDlg::OnBnClickedBrowseOutputFolder()
+{
+	setFolderForId(IDC_OUTPUT_DIRECTORY);
+}

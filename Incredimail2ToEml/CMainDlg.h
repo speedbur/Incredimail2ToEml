@@ -1,6 +1,8 @@
 #ifndef __CMainDlg_h_
 #define __CMainDlg_h_
 
+#include <string>
+
 class CMainDlg : public CDialogEx
 {
 public:
@@ -20,7 +22,13 @@ protected:
 	afx_msg void OnSysCommand(UINT nID, LPARAM lParam);
 	afx_msg void OnPaint();
 	afx_msg HCURSOR OnQueryDragIcon();
+	std::wstring openFolderDialog();
+	void setFolderForId(int nId);
+
 	DECLARE_MESSAGE_MAP()
+public:
+	afx_msg void OnBnClickedBrowseIncredimailDirectory();
+	afx_msg void OnBnClickedBrowseOutputFolder();
 };
 
 #endif
