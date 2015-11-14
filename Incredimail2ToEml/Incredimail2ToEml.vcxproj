@@ -189,6 +189,7 @@
     <Text Include="ReadMe.txt" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="CMailConverter.h" />
     <ClInclude Include="CMainDlg.h" />
     <ClInclude Include="Incredimail2ToEml.h" />
     <ClInclude Include="Resource.h" />
@@ -196,6 +197,7 @@
     <ClInclude Include="targetver.h" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="CMailConverter.cpp" />
     <ClCompile Include="CMainDlg.cpp" />
     <ClCompile Include="Incredimail2ToEml.cpp" />
     <ClCompile Include="stdafx.cpp">
