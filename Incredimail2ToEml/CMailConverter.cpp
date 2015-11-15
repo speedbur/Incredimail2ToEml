@@ -4,16 +4,6 @@
 #include <fstream>
 #include <regex>
 
-CMailConverter::CMailConverter()
-{
-
-}
-
-CMailConverter::~CMailConverter()
-{	
-
-}
-
 bool CMailConverter::convert(const std::wstring& sInFilename, const std::wstring& sOutFilename)
 {	
 	// read the whole mail... could be big i know, but its easy ;)
@@ -21,7 +11,7 @@ bool CMailConverter::convert(const std::wstring& sInFilename, const std::wstring
 	inStream.open(sInFilename.c_str());
 	inStream.seekg(0, std::ios::end);
 	int64_t nLength = inStream.tellg();
-	char* pBuffer = new char[nLength];
+	char* pBuffer = new char[static_cast<size_t>(nLength)];
 	inStream.seekg(0, std::ios::beg);
 	inStream.read(pBuffer, nLength);
 	inStream.close();
