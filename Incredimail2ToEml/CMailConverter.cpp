@@ -1,14 +1,70 @@
 #include "stdafx.h"
 #include "CMailConverter.h"
 #include <vector>
+#include <fstream>
+#include <regex>
 
 CMailConverter::CMailConverter()
 {
+
 }
 
-
 CMailConverter::~CMailConverter()
-{
+{	
+
+}
+
+bool CMailConverter::convert(const std::wstring& sInFilename, const std::wstring& sOutFilename)
+{	
+	// read the whole mail... could be big i know, but its easy ;)
+	std::ifstream inStream;
+	inStream.open(sInFilename.c_str());
+	inStream.seekg(0, std::ios::end);
+	int64_t nLength = inStream.tellg();
+	char* pBuffer = new char[nLength];
+	inStream.seekg(0, std::ios::beg);
+	inStream.read(pBuffer, nLength);
+	inStream.close();
+
+	// find line with "imbndary" tag
+	int nImbndaryLen = strlen("imbndary");
+	for (auto i = 0; i < nLength - nImbndaryLen; i++)
+	{
+		if (memcmp(&pBuffer[i], "imbndary", nImbndaryLen) == 0)
+		{
+			// replace string with boundary... this string is always smaller, then the source string, so we can replace it inline
+			char* pBeginningOfImbndarySection = &pBuffer[i];
+			char* pBeginingOfImbndarySectionData = nullptr;
+			char* pEndingOfImbndarySection = pBeginningOfImbndarySection;
+			int nEndingCounter = 0;
+			while (nEndingCounter < 2 && pEndingOfImbndarySection != &pBuffer[nLength])
+			{
+				pEndingOfImbndarySection++;
+				if (*pEndingOfImbndarySection == '"')
+				{
+					if (pBeginingOfImbndarySectionData == nullptr)
+						pBeginingOfImbndarySectionData = pEndingOfImbndarySection;
+					nEndingCounter++;
+				}
+			}
+
+			std::string sBoundaryData(pBeginingOfImbndarySectionData + 1, pEndingOfImbndarySection);
+			std::string sDecryptedBoundary = decryptBoundaryString(sBoundaryData);
+			
+			std::string sNewData = "boundary=\"" + sDecryptedBoundary + "\"";
+			memcpy_s(pBeginningOfImbndarySection, pEndingOfImbndarySection - pBeginningOfImbndarySection, sNewData.c_str(), sNewData.length());
+			memset(pBeginningOfImbndarySection + sNewData.length(), ' ', pEndingOfImbndarySection - pBeginningOfImbndarySection - sNewData.length() + 1);
+			break;
+		}
+	}
+
+	// write the new file
+	std::ofstream outStream(sOutFilename.c_str(), std::ios::out);
+	outStream.write(pBuffer, nLength);
+	outStream.close();
+
+	delete[] pBuffer;
+	return true;
 }
 
 std::vector<unsigned char> CMailConverter::convertToCharArray(const std::string& s)
