@@ -2,6 +2,10 @@
 #define __CMainDlg_h_
 
 #include <string>
+#include <vector>
+#include <memory>
+#include "CMailData.h"
+#include "sqlite/sqlite3.h"
 
 class CMainDlg : public CDialogEx
 {
@@ -15,8 +19,9 @@ public:
 protected:
 	virtual void DoDataExchange(CDataExchange* pDX);	// DDX/DDV support
 
-protected:
 	HICON m_hIcon;
+
+	std::vector<std::shared_ptr<CMailData>> fetchAllMailData(sqlite3* pDatabase);
 
 	virtual BOOL OnInitDialog();
 	afx_msg void OnSysCommand(UINT nID, LPARAM lParam);
@@ -29,6 +34,7 @@ protected:
 public:
 	afx_msg void OnBnClickedBrowseIncredimailDirectory();
 	afx_msg void OnBnClickedBrowseOutputFolder();
+	afx_msg void OnBnClickedExecute();
 };
 
 #endif

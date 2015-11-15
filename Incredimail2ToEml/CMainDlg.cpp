@@ -3,6 +3,9 @@
 #include "Incredimail2ToEml.h"
 #include "CMainDlg.h"
 #include "afxdialogex.h"
+#include <memory>
+#include "sqlite/sqlite3.h"
+
 
 class CAboutDlg : public CDialogEx
 {
@@ -16,7 +19,6 @@ public:
 protected:
 	virtual void DoDataExchange(CDataExchange* pDX);    // DDX/DDV support
 
-protected:
 	DECLARE_MESSAGE_MAP()
 };
 
@@ -50,6 +52,7 @@ BEGIN_MESSAGE_MAP(CMainDlg, CDialogEx)
 	ON_WM_QUERYDRAGICON()
 	ON_BN_CLICKED(IDC_BROWSE_INCREDIMAIL_DIRECTORY, &CMainDlg::OnBnClickedBrowseIncredimailDirectory)
 	ON_BN_CLICKED(IDC_BROWSE_OUTPUT_FOLDER, &CMainDlg::OnBnClickedBrowseOutputFolder)
+	ON_BN_CLICKED(IDC_EXECUTE, &CMainDlg::OnBnClickedExecute)
 END_MESSAGE_MAP()
 
 
@@ -184,4 +187,50 @@ void CMainDlg::OnBnClickedBrowseIncredimailDirectory()
 void CMainDlg::OnBnClickedBrowseOutputFolder()
 {
 	setFolderForId(IDC_OUTPUT_DIRECTORY);
+}
+
+std::vector<std::shared_ptr<CMailData>> CMainDlg::fetchAllMailData(sqlite3* pDatabase)
+{
+	std::vector<std::shared_ptr<CMailData>> aResult;
+	char* pErrorMessage = nullptr;
+	sqlite3_stmt* pStatement;
+
+	if (sqlite3_prepare16_v2(pDatabase, L"select HeaderID, ContainerID, Subject from AllHeaderDataView", -1, &pStatement, nullptr) != SQLITE_OK)
+	{
+		AfxMessageBox(L"error during maildata fetch");
+		return std::vector<std::shared_ptr<CMailData>>();
+	}
+
+	while (sqlite3_step(pStatement) == SQLITE_ROW)
+	{
+		std::wstring sHeaderId = (wchar_t*)sqlite3_column_text16(pStatement, 0);
+		std::wstring sContainerId = (wchar_t*)sqlite3_column_text16(pStatement, 1);
+		std::wstring sSubject = (wchar_t*)sqlite3_column_text16(pStatement, 2);
+		aResult.push_back(std::make_shared<CMailData>(sHeaderId, sContainerId, sSubject));
+	}
+	sqlite3_finalize(pStatement);
+
+	return aResult;
+}
+
+void CMainDlg::OnBnClickedExecute()
+{
+	CEdit* pEdit = (CEdit*)GetDlgItem(IDC_INCREDIMAIL_DIRECTORY);
+	CString sInputFilename;
+	pEdit->GetWindowTextW(sInputFilename);
+
+	sInputFilename += L"\\MessageStore.db";
+
+	sqlite3* pDatabase;
+	if (sqlite3_open16(sInputFilename.GetBuffer(), &pDatabase))
+	{
+		sqlite3_close(pDatabase);
+		::AfxMessageBox(L"could not open database connection");
+		return;
+	}
+
+	std::vector<std::shared_ptr<CMailData>> aMails = fetchAllMailData(pDatabase);
+
+
+	sqlite3_close(pDatabase);
 }
