@@ -6,6 +6,7 @@
 #include <memory>
 #include "CMailData.h"
 #include "sqlite/sqlite3.h"
+#include "CContainerData.h"
 
 class CMainDlg : public CDialogEx
 {
@@ -21,7 +22,9 @@ protected:
 
 	HICON m_hIcon;
 
-	std::vector<std::shared_ptr<CMailData>> fetchAllMailData(sqlite3* pDatabase);
+	void fetchAllMailData(sqlite3* pDatabase, const std::wstring& sContainerId, const std::shared_ptr<CContainerData>& pContainer);
+	std::shared_ptr<CContainerData> fetchContainerTree(sqlite3* pDatabase);
+	void fetchSubElement(sqlite3* pDatabase, const std::wstring& sId, const std::shared_ptr<CContainerData>& pContainer);
 
 	virtual BOOL OnInitDialog();
 	afx_msg void OnSysCommand(UINT nID, LPARAM lParam);

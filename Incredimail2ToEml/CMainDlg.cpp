@@ -5,7 +5,9 @@
 #include "afxdialogex.h"
 #include <memory>
 #include "sqlite/sqlite3.h"
-
+#include "CContainerData.h"
+#include <algorithm>
+#include <map>
 
 class CAboutDlg : public CDialogEx
 {
@@ -189,28 +191,93 @@ void CMainDlg::OnBnClickedBrowseOutputFolder()
 	setFolderForId(IDC_OUTPUT_DIRECTORY);
 }
 
-std::vector<std::shared_ptr<CMailData>> CMainDlg::fetchAllMailData(sqlite3* pDatabase)
+void CMainDlg::fetchAllMailData(sqlite3* pDatabase, const std::wstring& sContainerId, const std::shared_ptr<CContainerData>& pContainer)
 {
-	std::vector<std::shared_ptr<CMailData>> aResult;
 	char* pErrorMessage = nullptr;
 	sqlite3_stmt* pStatement;
 
-	if (sqlite3_prepare16_v2(pDatabase, L"select HeaderID, ContainerID, Subject from AllHeaderDataView", -1, &pStatement, nullptr) != SQLITE_OK)
+	std::wstring sQuery = L"select HeaderID, Subject from AllHeaderDataView where ContainerId = '" + sContainerId + L"'";
+	if (sqlite3_prepare16_v2(pDatabase, sQuery.c_str(), -1, &pStatement, nullptr) != SQLITE_OK)
 	{
 		AfxMessageBox(L"error during maildata fetch");
-		return std::vector<std::shared_ptr<CMailData>>();
+		return;
 	}
 
 	while (sqlite3_step(pStatement) == SQLITE_ROW)
 	{
 		std::wstring sHeaderId = (wchar_t*)sqlite3_column_text16(pStatement, 0);
-		std::wstring sContainerId = (wchar_t*)sqlite3_column_text16(pStatement, 1);
-		std::wstring sSubject = (wchar_t*)sqlite3_column_text16(pStatement, 2);
-		aResult.push_back(std::make_shared<CMailData>(sHeaderId, sContainerId, sSubject));
+		std::wstring sSubject = (wchar_t*)sqlite3_column_text16(pStatement, 1);
+		pContainer->addMail(std::make_shared<CMailData>(sHeaderId, sSubject));
+	}
+	sqlite3_finalize(pStatement);
+}
+
+void CMainDlg::fetchSubElement(sqlite3* pDatabase, const std::wstring& sId, const std::shared_ptr<CContainerData>& pContainer)
+{
+	char* pErrorMessage = nullptr;
+	sqlite3_stmt* pStatement;
+
+	std::shared_ptr<CContainerData> pResult;
+
+	// fetch all root nodes
+	std::wstring sQuery = L"select ContainerID, Label from Containers where ParentContainerID = '" + sId + L"'";
+	if (sqlite3_prepare16_v2(pDatabase, sQuery.c_str(), -1, &pStatement, nullptr) != SQLITE_OK)
+	{
+		AfxMessageBox(L"error during maildata fetch");
+		return;
+	}
+
+	std::map<std::wstring, std::shared_ptr<CContainerData>> mapContainerData;
+	while (sqlite3_step(pStatement) == SQLITE_ROW)
+	{
+		std::wstring sContainerId = (wchar_t*)sqlite3_column_text16(pStatement, 0);
+		std::wstring sLabel = (wchar_t*)sqlite3_column_text16(pStatement, 1);
+
+		mapContainerData[sContainerId] = std::make_shared<CContainerData>(sLabel);
+		pContainer->addChild(mapContainerData[sContainerId]);
+
 	}
 	sqlite3_finalize(pStatement);
 
-	return aResult;
+	for (const auto& it : mapContainerData)
+	{
+		fetchSubElement(pDatabase, it.first, it.second);
+		fetchAllMailData(pDatabase, it.first, it.second);
+	}
+}
+
+std::shared_ptr<CContainerData> CMainDlg::fetchContainerTree(sqlite3* pDatabase)
+{
+	std::shared_ptr<CContainerData> pRootElement = std::make_shared<CContainerData>(L"");
+
+	std::vector<std::wstring> aChildIds;
+	char* pErrorMessage = nullptr;
+	sqlite3_stmt* pStatement;
+
+	// fetch all root nodes
+	if (sqlite3_prepare16_v2(pDatabase, L"select ContainerID from Containers where ParentContainerID = ''", -1, &pStatement, nullptr) != SQLITE_OK)
+	{
+		AfxMessageBox(L"error during maildata fetch");
+		return nullptr;
+	}
+
+	while (sqlite3_step(pStatement) == SQLITE_ROW)
+	{
+		std::wstring sContainerId = (wchar_t*)sqlite3_column_text16(pStatement, 0);
+		aChildIds.push_back(sContainerId);
+		
+	}
+	sqlite3_finalize(pStatement);
+
+	for (const auto& sId : aChildIds)
+	{
+		std::shared_ptr<CContainerData> pData = std::make_shared<CContainerData>(L"");
+		fetchSubElement(pDatabase, sId, pData);
+		fetchAllMailData(pDatabase, sId, pData);
+		pRootElement->addChild(pData);
+	}
+
+	return pRootElement;
 }
 
 void CMainDlg::OnBnClickedExecute()
@@ -229,8 +296,7 @@ void CMainDlg::OnBnClickedExecute()
 		return;
 	}
 
-	std::vector<std::shared_ptr<CMailData>> aMails = fetchAllMailData(pDatabase);
-
+	std::shared_ptr<CContainerData> pContainerData = fetchContainerTree(pDatabase);
 
 	sqlite3_close(pDatabase);
 }
