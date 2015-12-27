@@ -7,14 +7,14 @@
 bool CMailConverter::convert(const std::wstring& sInFilename, const std::wstring& sOutFilename)
 {	
 	// read the whole mail... could be big i know, but its easy ;)
-	std::ifstream inStream;
-	inStream.open(sInFilename.c_str());
-	inStream.seekg(0, std::ios::end);
-	int64_t nLength = inStream.tellg();
+	struct _stat32 stat_buf;
+	_wstat32(sInFilename.c_str(), &stat_buf);
+	int nLength = stat_buf.st_size;
+	FILE* pFile;
+	_wfopen_s(&pFile, sInFilename.c_str(), L"rb");
 	char* pBuffer = new char[static_cast<size_t>(nLength)];
-	inStream.seekg(0, std::ios::beg);
-	inStream.read(pBuffer, nLength);
-	inStream.close();
+	fread(pBuffer, 1, nLength, pFile);
+	fclose(pFile);
 
 	// find line with "imbndary" tag
 	int nImbndaryLen = strlen("imbndary");
@@ -49,9 +49,9 @@ bool CMailConverter::convert(const std::wstring& sInFilename, const std::wstring
 	}
 
 	// write the new file
-	std::ofstream outStream(sOutFilename.c_str(), std::ios::out);
-	outStream.write(pBuffer, nLength);
-	outStream.close();
+	_wfopen_s(&pFile, sOutFilename.c_str(), L"wb");
+	fwrite(pBuffer, 1, nLength, pFile);
+	fclose(pFile);
 
 	delete[] pBuffer;
 	return true;
