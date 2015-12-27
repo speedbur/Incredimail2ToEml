@@ -8,6 +8,7 @@
 #include "CContainerData.h"
 #include <algorithm>
 #include <map>
+#include "CMailConverter.h"
 
 class CAboutDlg : public CDialogEx
 {
@@ -280,23 +281,69 @@ std::shared_ptr<CContainerData> CMainDlg::fetchContainerTree(sqlite3* pDatabase)
 	return pRootElement;
 }
 
+void CMainDlg::cleanName(std::wstring& sName) 
+{
+	for (wchar_t& c : sName)
+		if (c < 32 || c == L'<' || c == L'>' || c == L':' || c == L'"' || c == L'/' || c == L'\\' || c == L'|' || c == L'?' || c == L'*')
+			c = L'_';
+}
+
+void CMainDlg::convertAndStoreMessage(const std::wstring& sMessageRootDirectory, const std::wstring& sTargetFolder, const std::shared_ptr<CContainerData>& pFolder)
+{
+	std::wstring sName = pFolder->getName();
+	cleanName(sName);
+	
+	std::wstring sTargetSubFolder = sTargetFolder;
+	if (!sName.empty())
+		sTargetSubFolder += sName + L"\\";
+
+	// create directory
+	::CreateDirectoryW(sTargetSubFolder.c_str(), nullptr);
+
+	// write mail data
+	for (const auto& pMail : pFolder->getMailData()) 
+	{
+		std::wstring sInFilename = sMessageRootDirectory + pMail->getHeaderId() + L"\\msg.iml";
+
+		std::wstring sOutFilename = pMail->getSubject();
+		cleanName(sOutFilename);
+		std::wstring sCleanedOutFilename = sTargetSubFolder + sOutFilename + L".eml";
+		while (PathFileExists(sCleanedOutFilename.c_str()) == TRUE)
+			sCleanedOutFilename = sTargetSubFolder + sOutFilename + L" " + pMail->getHeaderId() + L".eml";
+		CMailConverter::convert(sInFilename, sCleanedOutFilename);
+	}
+
+	// iterate through sub folders
+	for (const auto& pSubFolder : pFolder->getChildren()) 
+	{
+		convertAndStoreMessage(sMessageRootDirectory, sTargetSubFolder, pSubFolder);
+	}
+}
+
 void CMainDlg::OnBnClickedExecute()
 {
 	CEdit* pEdit = (CEdit*)GetDlgItem(IDC_INCREDIMAIL_DIRECTORY);
-	CString sInputFilename;
-	pEdit->GetWindowTextW(sInputFilename);
+	CEdit* pTargetEdit = (CEdit*)GetDlgItem(IDC_OUTPUT_DIRECTORY);
+	CString sInputDir;
+	CString sOutputDir;
+	pEdit->GetWindowTextW(sInputDir);
+	pTargetEdit->GetWindowTextW(sOutputDir);
+	sOutputDir += L"\\";
 
-	sInputFilename += L"\\MessageStore.db";
+	std::wstring sInputFilename = sInputDir + L"\\MessageStore.db";
 
 	sqlite3* pDatabase;
-	if (sqlite3_open16(sInputFilename.GetBuffer(), &pDatabase))
+	if (sqlite3_open16(sInputFilename.c_str(), &pDatabase))
 	{
 		sqlite3_close(pDatabase);
 		::AfxMessageBox(L"could not open database connection");
 		return;
 	}
-
 	std::shared_ptr<CContainerData> pContainerData = fetchContainerTree(pDatabase);
-
 	sqlite3_close(pDatabase);
+
+	::CreateDirectoryW(sOutputDir, nullptr);
+
+	std::wstring sMessageStoreDirectory = sInputDir + L"\\Messages\\1\\";
+	convertAndStoreMessage(sMessageStoreDirectory, sOutputDir.GetBuffer(), pContainerData);
 }
