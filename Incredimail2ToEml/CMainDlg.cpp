@@ -307,6 +307,10 @@ void CMainDlg::convertAndStoreMessage(const std::wstring& sMessageRootDirectory,
 
 		std::wstring sOutFilename = pMail->getSubject();
 		cleanName(sOutFilename);
+		if (sOutFilename.empty())
+			sOutFilename = L"No Subject";
+		if (sOutFilename.length() > 100)
+			sOutFilename = sOutFilename.substr(0, 100);
 		std::wstring sCleanedOutFilename = sTargetSubFolder + sOutFilename + L".eml";
 		while (PathFileExists(sCleanedOutFilename.c_str()) == TRUE)
 			sCleanedOutFilename = sTargetSubFolder + sOutFilename + L" " + pMail->getHeaderId() + L".eml";
