@@ -2,7 +2,17 @@
 #include "CMailConverter.h"
 #include <vector>
 #include <fstream>
-#include <regex>
+#include <locale>
+#include <codecvt>
+#include <algorithm>
+#include "base64.h"
+
+int64_t CMailConverter::getFileSize(const std::wstring& sFilename)
+{
+	struct _stat32 stat_buf;
+	_wstat32(sFilename.c_str(), &stat_buf);
+	return stat_buf.st_size;
+}
 
 bool CMailConverter::extractMailFromImmFile(const std::wstring& sImmFilename, int64_t nOffset, int64_t nLength, const std::wstring& sOutFilename)
 {
@@ -15,22 +25,19 @@ bool CMailConverter::extractMailFromImmFile(const std::wstring& sImmFilename, in
 	fread_s(pBuffer, (size_t)nLength, 1, (size_t)nLength, pFile);
 	fclose(pFile);
 
-	_wfopen_s(&pFile, sOutFilename.c_str(), L"wb");
-	fwrite(pBuffer, 1, (size_t)nLength, pFile);
-	fclose(pFile);
+	bool bResult = resolveAttachmentsAndWriteFile(extractBaseFolder(sImmFilename) + L"\\Attachments", pBuffer, sOutFilename);
 	delete[] pBuffer;
-	return true;
+	return bResult;
 }
 
 bool CMailConverter::convert(const std::wstring& sInFilename, const std::wstring& sOutFilename)
 {	
 	// read the whole mail... could be big i know, but its easy ;)
-	struct _stat32 stat_buf;
-	_wstat32(sInFilename.c_str(), &stat_buf);
-	int nLength = stat_buf.st_size;
+	int nLength = (int)getFileSize(sInFilename);
 	FILE* pFile;
 	_wfopen_s(&pFile, sInFilename.c_str(), L"rb");
-	char* pBuffer = new char[static_cast<size_t>(nLength)];
+	char* pBuffer = new char[static_cast<size_t>(nLength)+1];
+	pBuffer[nLength] = '\0';
 	fread(pBuffer, 1, nLength, pFile);
 	fclose(pFile);
 
@@ -66,12 +73,80 @@ bool CMailConverter::convert(const std::wstring& sInFilename, const std::wstring
 		}
 	}
 
+	bool bResult = resolveAttachmentsAndWriteFile(extractBaseFolder(sInFilename) + L"\\Attachments", pBuffer, sOutFilename);
+	delete[] pBuffer;
+	return bResult;
+}
+
+std::wstring CMailConverter::extractBaseFolder(const std::wstring& sFilename)
+{
+	std::wstring::size_type lastSlashPosition = sFilename.find_last_of(L'\\');
+	return sFilename.substr(0, lastSlashPosition);
+}
+
+bool CMailConverter::resolveAttachmentsAndWriteFile(const std::wstring& sAttachmentFolder, const char* pBuffer, const std::wstring& sOutFilename)
+{
+	int nLength = strlen(pBuffer);
+
 	// write the new file
+	FILE* pFile;
 	_wfopen_s(&pFile, sOutFilename.c_str(), L"wb");
-	fwrite(pBuffer, 1, nLength, pFile);
+	
+	std::wstring_convert<std::codecvt_utf8<wchar_t>> converter;
+
+	// try to find attachment marker
+	int nFilePathMarker = strlen("----------[%ImFilePath%]----------");
+	int i = 0;
+	int nWriteStart = 0;
+	while (i < nLength - nFilePathMarker)
+	{
+		if (memcmp(&pBuffer[i], "----------[%ImFilePath%]----------", nFilePathMarker) == 0)
+		{
+			fwrite(&pBuffer[nWriteStart], 1, i - nWriteStart, pFile);
+
+			i += nFilePathMarker;
+			const char* pStartFilename = &pBuffer[i];
+			while (pBuffer[i] != '\r' && (pBuffer[i] != '\n'))
+				i++;
+			std::string sFilenameA(pStartFilename, &pBuffer[i]);
+
+			// write base64 data
+			std::wstring sFilename = sAttachmentFolder + L"\\" + converter.from_bytes(sFilenameA);
+			int64_t nFilesize = getFileSize(sFilename);
+			FILE* pAttachmentFile;
+			_wfopen_s(&pAttachmentFile, sFilename.c_str(), L"rb");
+			unsigned char* pAttachmentBuffer = new unsigned char[static_cast<size_t>(nFilesize)];
+			fread(pAttachmentBuffer, 1, (size_t)nFilesize, pAttachmentFile);
+			fclose(pAttachmentFile);
+			std::string sBase64EncodedData = base64_encode(pAttachmentBuffer, (unsigned int)nFilesize);
+			delete[] pAttachmentBuffer;
+
+			int nLineWidth = 76;
+			std::string::size_type nPosition = 0;
+			std::string::size_type nRemaining = sBase64EncodedData.length();
+			while (nRemaining > 0) 
+			{
+				std::string::size_type nToWrite = std::min<std::string::size_type>(nLineWidth, nRemaining);
+				const char* pLine = sBase64EncodedData.c_str() + nPosition;
+				fwrite(pLine, 1, nToWrite, pFile);
+				fwrite("\r\n", 1, 2, pFile);
+				if (nLineWidth > (int)nRemaining)
+					nRemaining = 0;
+				else
+					nRemaining -= nLineWidth;
+				nPosition += nToWrite;
+			}
+			nWriteStart = i;
+		}
+		i++;
+	}
+
+	// write remaining data
+	if (i - nWriteStart > 0)
+		fwrite(&pBuffer[nWriteStart], 1, i - nWriteStart + nFilePathMarker, pFile);
+
 	fclose(pFile);
 
-	delete[] pBuffer;
 	return true;
 }
 

@@ -361,6 +361,9 @@ void CMainDlg::convertAndStoreMessage(const std::wstring& sInputDir, const std::
 
 void CMainDlg::OnBnClickedExecute()
 {
+	CMailConverter::convert(L"C:\\temp\\testare\\msg.iml", L"c:\\temp\\test.eml");
+	return;
+
 	CEdit* pEdit = (CEdit*)GetDlgItem(IDC_INCREDIMAIL_DIRECTORY);
 	CEdit* pTargetEdit = (CEdit*)GetDlgItem(IDC_OUTPUT_DIRECTORY);
 	CString sInputDir;

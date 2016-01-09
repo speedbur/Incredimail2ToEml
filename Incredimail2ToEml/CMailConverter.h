@@ -13,7 +13,12 @@ private:
 	static std::vector<unsigned char> convertToCharArray(const std::string& s);
 	static std::string decryptBoundaryString(const std::string& sIncredimailBoundary);
 
+	// delete result with delete[]
+	static bool resolveAttachmentsAndWriteFile(const std::wstring& sAttachmentFolder, const char* pBuffer, const std::wstring& sOutFilename);
 
+	static std::wstring extractBaseFolder(const std::wstring& sFilename);
+
+	static int64_t getFileSize(const std::wstring& sFilename);
 };
 
 #endif // _CMailConverter_h_
