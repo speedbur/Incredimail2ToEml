@@ -4,6 +4,24 @@
 #include <fstream>
 #include <regex>
 
+bool CMailConverter::extractMailFromImmFile(const std::wstring& sImmFilename, int64_t nOffset, int64_t nLength, const std::wstring& sOutFilename)
+{
+	FILE* pFile;
+	_wfopen_s(&pFile, sImmFilename.c_str(), L"rb");
+
+	char* pBuffer = new char[(size_t)nLength+1];
+	pBuffer[nLength] = '\0';
+	_fseeki64(pFile, nOffset, SEEK_SET);
+	fread_s(pBuffer, (size_t)nLength, 1, (size_t)nLength, pFile);
+	fclose(pFile);
+
+	_wfopen_s(&pFile, sOutFilename.c_str(), L"wb");
+	fwrite(pBuffer, 1, (size_t)nLength, pFile);
+	fclose(pFile);
+	delete[] pBuffer;
+	return true;
+}
+
 bool CMailConverter::convert(const std::wstring& sInFilename, const std::wstring& sOutFilename)
 {	
 	// read the whole mail... could be big i know, but its easy ;)

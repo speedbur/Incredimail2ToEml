@@ -303,7 +303,7 @@ void CMainDlg::cleanName(std::wstring& sName)
 			c = L'_';
 }
 
-void CMainDlg::convertAndStoreMessage(const std::wstring& sMessageRootDirectory, const std::wstring& sTargetFolder, const std::shared_ptr<CContainerData>& pFolder)
+void CMainDlg::convertAndStoreMessage(const std::wstring& sInputDir, const std::wstring& sTargetFolder, const std::shared_ptr<CContainerData>& pFolder)
 {
 	std::wstring sName = pFolder->getName();
 	cleanName(sName);
@@ -318,8 +318,6 @@ void CMainDlg::convertAndStoreMessage(const std::wstring& sMessageRootDirectory,
 	// write mail data
 	for (const auto& pMail : pFolder->getMailData()) 
 	{
-		std::wstring sInFilename = sMessageRootDirectory + pMail->getHeaderId() + L"\\msg.iml";
-
 		std::wstring sOutFilename = pMail->getSubject();
 		cleanName(sOutFilename);
 		if (sOutFilename.empty())
@@ -335,11 +333,19 @@ void CMainDlg::convertAndStoreMessage(const std::wstring& sMessageRootDirectory,
 		switch (pMail->getMailLocation())
 		{
 			case CMailData::MailLocation::Filesystem:
+			{
+				std::wstring sMessageRootDirectory = sInputDir + L"\\Messages\\1\\";
+				std::wstring sInFilename = sMessageRootDirectory + pMail->getHeaderId() + L"\\msg.iml";
 				CMailConverter::convert(sInFilename, sCleanedOutFilename);
 				break;
+			}
 
 			case CMailData::MailLocation::ImmDatabaseFile:
+			{
+				std::wstring sImmFilename = sInputDir + L"\\" + pFolder->getFilename() + L".imm";
+				CMailConverter::extractMailFromImmFile(sImmFilename, pMail->getMessagePos(), pMail->getLightMessageSize(), sCleanedOutFilename);
 				break;
+			}
 
 			default:
 				throw std::exception("unknown mail location for conversion");
@@ -349,7 +355,7 @@ void CMainDlg::convertAndStoreMessage(const std::wstring& sMessageRootDirectory,
 	// iterate through sub folders
 	for (const auto& pSubFolder : pFolder->getChildren()) 
 	{
-		convertAndStoreMessage(sMessageRootDirectory, sTargetSubFolder, pSubFolder);
+		convertAndStoreMessage(sInputDir, sTargetSubFolder, pSubFolder);
 	}
 }
 
@@ -377,6 +383,7 @@ void CMainDlg::OnBnClickedExecute()
 
 	::CreateDirectoryW(sOutputDir, nullptr);
 
-	std::wstring sMessageStoreDirectory = sInputDir + L"\\Messages\\1\\";
-	convertAndStoreMessage(sMessageStoreDirectory, sOutputDir.GetBuffer(), pContainerData);
+	
+	std::wstring sInputDirWString = sInputDir;
+	convertAndStoreMessage(sInputDirWString, sOutputDir.GetBuffer(), pContainerData);
 }
