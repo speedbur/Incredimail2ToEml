@@ -25,8 +25,10 @@ protected:
 	void fetchAllMailData(sqlite3* pDatabase, const std::wstring& sContainerId, const std::shared_ptr<CContainerData>& pContainer);
 	std::shared_ptr<CContainerData> fetchContainerTree(sqlite3* pDatabase);
 	void fetchSubElement(sqlite3* pDatabase, const std::wstring& sId, const std::shared_ptr<CContainerData>& pContainer);
-	void convertAndStoreMessage(const std::wstring& sInputDir, const std::wstring& sTargetFolder, const std::shared_ptr<CContainerData>& pFolder);
+	void convertAndStoreMessage(const std::wstring& sInputDir, const std::wstring& sTargetFolder, const std::shared_ptr<CContainerData>& pFolder, volatile int& nCurrentProgress);
 	void cleanName(std::wstring& sName);
+
+	int getMailCount(const std::shared_ptr<CContainerData>& pContainerData);
 
 	virtual BOOL OnInitDialog();
 	afx_msg void OnSysCommand(UINT nID, LPARAM lParam);

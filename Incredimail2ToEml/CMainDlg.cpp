@@ -8,6 +8,7 @@
 #include "CContainerData.h"
 #include <algorithm>
 #include <map>
+#include <thread>
 #include "CMailConverter.h"
 
 class CAboutDlg : public CDialogEx
@@ -303,7 +304,7 @@ void CMainDlg::cleanName(std::wstring& sName)
 			c = L'_';
 }
 
-void CMainDlg::convertAndStoreMessage(const std::wstring& sInputDir, const std::wstring& sTargetFolder, const std::shared_ptr<CContainerData>& pFolder)
+void CMainDlg::convertAndStoreMessage(const std::wstring& sInputDir, const std::wstring& sTargetFolder, const std::shared_ptr<CContainerData>& pFolder, volatile int& nCurrentProgress)
 {
 	std::wstring sName = pFolder->getName();
 	cleanName(sName);
@@ -318,6 +319,8 @@ void CMainDlg::convertAndStoreMessage(const std::wstring& sInputDir, const std::
 	// write mail data
 	for (const auto& pMail : pFolder->getMailData()) 
 	{
+		nCurrentProgress++;
+
 		std::wstring sOutFilename = pMail->getSubject();
 		cleanName(sOutFilename);
 		if (sOutFilename.empty())
@@ -355,14 +358,31 @@ void CMainDlg::convertAndStoreMessage(const std::wstring& sInputDir, const std::
 	// iterate through sub folders
 	for (const auto& pSubFolder : pFolder->getChildren()) 
 	{
-		convertAndStoreMessage(sInputDir, sTargetSubFolder, pSubFolder);
+		convertAndStoreMessage(sInputDir, sTargetSubFolder, pSubFolder, nCurrentProgress);
 	}
+}
+
+int CMainDlg::getMailCount(const std::shared_ptr<CContainerData>& pContainerData)
+{
+	int nResult = pContainerData->getMailData().size();
+	for (const auto& pChild : pContainerData->getChildren()) 
+		nResult += getMailCount(pChild);
+	return nResult;
 }
 
 void CMainDlg::OnBnClickedExecute()
 {
 	CEdit* pEdit = (CEdit*)GetDlgItem(IDC_INCREDIMAIL_DIRECTORY);
 	CEdit* pTargetEdit = (CEdit*)GetDlgItem(IDC_OUTPUT_DIRECTORY);
+	CButton* pConvertButton = (CButton*)GetDlgItem(IDC_EXECUTE);
+	CButton* pCloseButton = (CButton*)GetDlgItem(IDOK);
+	pConvertButton->EnableWindow(FALSE);
+	pCloseButton->EnableWindow(FALSE);
+
+	CProgressCtrl* pProgress = (CProgressCtrl*)GetDlgItem(IDC_PROGRESS1);
+	pProgress->SetRange32(0, 1);
+	pProgress->SetPos(0);
+
 	CString sInputDir;
 	CString sOutputDir;
 	pEdit->GetWindowTextW(sInputDir);
@@ -383,7 +403,41 @@ void CMainDlg::OnBnClickedExecute()
 
 	::CreateDirectoryW(sOutputDir, nullptr);
 
+	int nEmailCount = getMailCount(pContainerData);
+	pProgress->SetRange32(0, nEmailCount);
+
+	volatile bool bFinished = false;
+	volatile int nCurrentProgress = 0;
+
+	std::wstring sOutputDirW = sOutputDir;
+	std::thread thread([&bFinished, sInputDir, sOutputDirW, pContainerData, &nCurrentProgress, this]()
+	{
+		try
+		{
+			std::wstring sInputDirWString = sInputDir;
+			convertAndStoreMessage(sInputDirWString, sOutputDirW, pContainerData, nCurrentProgress);
+		}
+		catch (...)
+		{
+
+		}
+		bFinished = true;
+	});
 	
-	std::wstring sInputDirWString = sInputDir;
-	convertAndStoreMessage(sInputDirWString, sOutputDir.GetBuffer(), pContainerData);
+	MSG msg;
+	while (!bFinished)
+	{
+		pProgress->SetPos(nCurrentProgress);
+
+		if (PeekMessage(&msg, nullptr, 0, 0, PM_REMOVE))
+		{
+			TranslateMessage(&msg);
+			DispatchMessage(&msg);
+		}
+
+		::Sleep(1);
+	}
+
+	pConvertButton->EnableWindow(TRUE);
+	pCloseButton->EnableWindow(TRUE);
 }

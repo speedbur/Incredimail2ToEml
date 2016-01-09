@@ -137,14 +137,18 @@ bool CMailConverter::resolveAttachmentsAndWriteFile(const std::wstring& sAttachm
 			std::string sFilenameA(pStartFilename, &pBuffer[i]);
 			std::wstring sFilename = sAttachmentFolder + L"\\" + convertFilename(sFilenameA);
 
+			std::string sBase64EncodedData = "";
 			int64_t nFilesize = getFileSize(sFilename);
-			FILE* pAttachmentFile;
-			_wfopen_s(&pAttachmentFile, sFilename.c_str(), L"rb");
-			unsigned char* pAttachmentBuffer = new unsigned char[static_cast<size_t>(nFilesize)];
-			fread(pAttachmentBuffer, 1, (size_t)nFilesize, pAttachmentFile);
-			fclose(pAttachmentFile);
-			std::string sBase64EncodedData = base64_encode(pAttachmentBuffer, (unsigned int)nFilesize);
-			delete[] pAttachmentBuffer;
+			if (nFilesize > 0)
+			{
+				FILE* pAttachmentFile;
+				_wfopen_s(&pAttachmentFile, sFilename.c_str(), L"rb");
+				unsigned char* pAttachmentBuffer = new unsigned char[static_cast<size_t>(nFilesize)];
+				fread(pAttachmentBuffer, 1, (size_t)nFilesize, pAttachmentFile);
+				fclose(pAttachmentFile);
+				sBase64EncodedData = base64_encode(pAttachmentBuffer, (unsigned int)nFilesize);
+				delete[] pAttachmentBuffer;
+			}
 
 			int nLineWidth = 76;
 			std::string::size_type nPosition = 0;
