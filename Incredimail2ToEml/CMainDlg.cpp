@@ -186,7 +186,6 @@ void CMainDlg::OnBnClickedBrowseIncredimailDirectory()
 	setFolderForId(IDC_INCREDIMAIL_DIRECTORY);
 }
 
-
 void CMainDlg::OnBnClickedBrowseOutputFolder()
 {
 	setFolderForId(IDC_OUTPUT_DIRECTORY);
@@ -197,7 +196,7 @@ void CMainDlg::fetchAllMailData(sqlite3* pDatabase, const std::wstring& sContain
 	char* pErrorMessage = nullptr;
 	sqlite3_stmt* pStatement;
 
-	std::wstring sQuery = L"select HeaderID, Subject from AllHeaderDataView where ContainerId = '" + sContainerId + L"'";
+	std::wstring sQuery = L"select HeaderID, Subject, Location, MsgPos from Headers where ContainerId = '" + sContainerId + L"'";
 	if (sqlite3_prepare16_v2(pDatabase, sQuery.c_str(), -1, &pStatement, nullptr) != SQLITE_OK)
 	{
 		AfxMessageBox(L"error during maildata fetch");
@@ -208,7 +207,21 @@ void CMainDlg::fetchAllMailData(sqlite3* pDatabase, const std::wstring& sContain
 	{
 		std::wstring sHeaderId = (wchar_t*)sqlite3_column_text16(pStatement, 0);
 		std::wstring sSubject = (wchar_t*)sqlite3_column_text16(pStatement, 1);
-		pContainer->addMail(std::make_shared<CMailData>(sHeaderId, sSubject));
+		int nMessageLocation = sqlite3_column_int(pStatement, 2);
+		int64_t nMessagePos = sqlite3_column_int64(pStatement, 3);
+
+		CMailData::MailLocation location;
+		if (nMessageLocation == 0)
+			location = CMailData::MailLocation::ImmDatabaseFile;
+		else if (nMessageLocation == 1)
+			location = CMailData::MailLocation::Filesystem;
+		else
+		{
+			AfxMessageBox(L"unknown mail location");
+			return;
+		}
+
+		pContainer->addMail(std::make_shared<CMailData>(sHeaderId, sSubject, location, nMessagePos));
 	}
 	sqlite3_finalize(pStatement);
 }
@@ -311,10 +324,24 @@ void CMainDlg::convertAndStoreMessage(const std::wstring& sMessageRootDirectory,
 			sOutFilename = L"No Subject";
 		if (sOutFilename.length() > 100)
 			sOutFilename = sOutFilename.substr(0, 100);
+
+		// find unique name for output file
 		std::wstring sCleanedOutFilename = sTargetSubFolder + sOutFilename + L".eml";
 		while (PathFileExists(sCleanedOutFilename.c_str()) == TRUE)
 			sCleanedOutFilename = sTargetSubFolder + sOutFilename + L" " + pMail->getHeaderId() + L".eml";
-		CMailConverter::convert(sInFilename, sCleanedOutFilename);
+
+		switch (pMail->getMailLocation())
+		{
+			case CMailData::MailLocation::Filesystem:
+				CMailConverter::convert(sInFilename, sCleanedOutFilename);
+				break;
+
+			case CMailData::MailLocation::ImmDatabaseFile:
+				break;
+
+			default:
+				throw std::exception("unknown mail location for conversion");
+		}
 	}
 
 	// iterate through sub folders
