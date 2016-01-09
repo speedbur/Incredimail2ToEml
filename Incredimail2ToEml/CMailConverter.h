@@ -19,6 +19,9 @@ private:
 	static std::wstring extractBaseFolder(const std::wstring& sFilename);
 
 	static int64_t getFileSize(const std::wstring& sFilename);
+	static std::wstring convertFilename(const std::string& sFilename);
+
+	static std::wstring CPtoWString(const std::string& sInput, int nCodepage);
 };
 
 #endif // _CMailConverter_h_

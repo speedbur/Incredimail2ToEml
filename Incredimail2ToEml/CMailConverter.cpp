@@ -84,6 +84,32 @@ std::wstring CMailConverter::extractBaseFolder(const std::wstring& sFilename)
 	return sFilename.substr(0, lastSlashPosition);
 }
 
+std::wstring CMailConverter::convertFilename(const std::string& sFilename) 
+{
+	std::string sIsoStart = "=?iso-8859-1?B?";
+	if (sIsoStart.length() > sFilename.length())
+		return CPtoWString(sFilename, CP_UTF8);
+
+	if (memcmp(sIsoStart.c_str(), sFilename.c_str(), sIsoStart.length()) == 0)
+	{
+		//=?iso-8859-1?B?SGFuZG91dCBMeXJpay1XZXJrc3RhdHQgT3NuYWJy/GNrLmRvYw==?=
+		std::string sMimeString = sFilename.substr(sIsoStart.length(), sFilename.length() - sIsoStart.length() - 2);
+		return CPtoWString(base64_decode(sMimeString), CP_ACP);
+	}
+	
+	return CPtoWString(sFilename, CP_UTF8);
+}
+
+std::wstring CMailConverter::CPtoWString(const std::string& sInput, int nCodePage)
+{
+	int nNeededSize = ::MultiByteToWideChar(nCodePage, 0, sInput.c_str(), -1, nullptr, 0);
+	wchar_t* pOutput = new wchar_t[nNeededSize];
+	::MultiByteToWideChar(nCodePage, 0, sInput.c_str(), -1, pOutput, nNeededSize);
+	std::wstring sResult = pOutput;
+	delete[] pOutput;
+	return sResult;
+}
+
 bool CMailConverter::resolveAttachmentsAndWriteFile(const std::wstring& sAttachmentFolder, const char* pBuffer, const std::wstring& sOutFilename)
 {
 	int nLength = strlen(pBuffer);
@@ -92,8 +118,6 @@ bool CMailConverter::resolveAttachmentsAndWriteFile(const std::wstring& sAttachm
 	FILE* pFile;
 	_wfopen_s(&pFile, sOutFilename.c_str(), L"wb");
 	
-	std::wstring_convert<std::codecvt_utf8<wchar_t>> converter;
-
 	// try to find attachment marker
 	int nFilePathMarker = strlen("----------[%ImFilePath%]----------");
 	int i = 0;
@@ -108,10 +132,11 @@ bool CMailConverter::resolveAttachmentsAndWriteFile(const std::wstring& sAttachm
 			const char* pStartFilename = &pBuffer[i];
 			while (pBuffer[i] != '\r' && (pBuffer[i] != '\n'))
 				i++;
-			std::string sFilenameA(pStartFilename, &pBuffer[i]);
-
+			
 			// write base64 data
-			std::wstring sFilename = sAttachmentFolder + L"\\" + converter.from_bytes(sFilenameA);
+			std::string sFilenameA(pStartFilename, &pBuffer[i]);
+			std::wstring sFilename = sAttachmentFolder + L"\\" + convertFilename(sFilenameA);
+
 			int64_t nFilesize = getFileSize(sFilename);
 			FILE* pAttachmentFile;
 			_wfopen_s(&pAttachmentFile, sFilename.c_str(), L"rb");
