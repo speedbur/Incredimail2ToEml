@@ -2,9 +2,10 @@
 #include "CContainerData.h"
 
 
-CContainerData::CContainerData(const std::wstring& sName)
+CContainerData::CContainerData(const std::wstring& sName, const std::wstring& sFilename)
 {
 	m_sName = sName;
+	m_sFilename = sFilename;
 }
 
 CContainerData::~CContainerData()
@@ -14,6 +15,11 @@ CContainerData::~CContainerData()
 std::wstring CContainerData::getName() const
 {
 	return m_sName;
+}
+
+std::wstring CContainerData::getFilename() const
+{
+	return m_sFilename;
 }
 
 std::vector<std::shared_ptr<CContainerData>> CContainerData::getChildren() const

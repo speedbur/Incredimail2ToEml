@@ -235,7 +235,7 @@ void CMainDlg::fetchSubElement(sqlite3* pDatabase, const std::wstring& sId, cons
 	std::shared_ptr<CContainerData> pResult;
 
 	// fetch all root nodes
-	std::wstring sQuery = L"select ContainerID, Label from Containers where ParentContainerID = '" + sId + L"'";
+	std::wstring sQuery = L"select ContainerID, Label, FileName from Containers where ParentContainerID = '" + sId + L"'";
 	if (sqlite3_prepare16_v2(pDatabase, sQuery.c_str(), -1, &pStatement, nullptr) != SQLITE_OK)
 	{
 		AfxMessageBox(L"error during maildata fetch");
@@ -247,8 +247,9 @@ void CMainDlg::fetchSubElement(sqlite3* pDatabase, const std::wstring& sId, cons
 	{
 		std::wstring sContainerId = (wchar_t*)sqlite3_column_text16(pStatement, 0);
 		std::wstring sLabel = (wchar_t*)sqlite3_column_text16(pStatement, 1);
+		std::wstring sFilename = (wchar_t*)sqlite3_column_text16(pStatement, 2);
 
-		mapContainerData[sContainerId] = std::make_shared<CContainerData>(sLabel);
+		mapContainerData[sContainerId] = std::make_shared<CContainerData>(sLabel, sFilename);
 		pContainer->addChild(mapContainerData[sContainerId]);
 
 	}
@@ -263,7 +264,7 @@ void CMainDlg::fetchSubElement(sqlite3* pDatabase, const std::wstring& sId, cons
 
 std::shared_ptr<CContainerData> CMainDlg::fetchContainerTree(sqlite3* pDatabase)
 {
-	std::shared_ptr<CContainerData> pRootElement = std::make_shared<CContainerData>(L"");
+	std::shared_ptr<CContainerData> pRootElement = std::make_shared<CContainerData>(L"", L"");
 
 	std::vector<std::wstring> aChildIds;
 	char* pErrorMessage = nullptr;
@@ -286,7 +287,7 @@ std::shared_ptr<CContainerData> CMainDlg::fetchContainerTree(sqlite3* pDatabase)
 
 	for (const auto& sId : aChildIds)
 	{
-		std::shared_ptr<CContainerData> pData = std::make_shared<CContainerData>(L"");
+		std::shared_ptr<CContainerData> pData = std::make_shared<CContainerData>(L"", L"");
 		fetchSubElement(pDatabase, sId, pData);
 		fetchAllMailData(pDatabase, sId, pData);
 		pRootElement->addChild(pData);
