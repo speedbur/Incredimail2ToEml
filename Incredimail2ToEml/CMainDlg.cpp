@@ -196,7 +196,7 @@ void CMainDlg::fetchAllMailData(sqlite3* pDatabase, const std::wstring& sContain
 	char* pErrorMessage = nullptr;
 	sqlite3_stmt* pStatement;
 
-	std::wstring sQuery = L"select HeaderID, Subject, Location, MsgPos from Headers where ContainerId = '" + sContainerId + L"'";
+	std::wstring sQuery = L"select HeaderID, Subject, Location, MsgPos, LightMsgSize from Headers where ContainerId = '" + sContainerId + L"'";
 	if (sqlite3_prepare16_v2(pDatabase, sQuery.c_str(), -1, &pStatement, nullptr) != SQLITE_OK)
 	{
 		AfxMessageBox(L"error during maildata fetch");
@@ -209,6 +209,7 @@ void CMainDlg::fetchAllMailData(sqlite3* pDatabase, const std::wstring& sContain
 		std::wstring sSubject = (wchar_t*)sqlite3_column_text16(pStatement, 1);
 		int nMessageLocation = sqlite3_column_int(pStatement, 2);
 		int64_t nMessagePos = sqlite3_column_int64(pStatement, 3);
+		int64_t nLightMessageSize = sqlite3_column_int64(pStatement, 4);
 
 		CMailData::MailLocation location;
 		if (nMessageLocation == 0)
@@ -221,7 +222,7 @@ void CMainDlg::fetchAllMailData(sqlite3* pDatabase, const std::wstring& sContain
 			return;
 		}
 
-		pContainer->addMail(std::make_shared<CMailData>(sHeaderId, sSubject, location, nMessagePos));
+		pContainer->addMail(std::make_shared<CMailData>(sHeaderId, sSubject, location, nMessagePos, nLightMessageSize));
 	}
 	sqlite3_finalize(pStatement);
 }
